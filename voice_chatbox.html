@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Voice Chat Test</title>
+    <style>
+        body {
+            background: black;
+            color: white;
+            font-family: Arial;
+            padding: 20px;
+            margin: 0;
+        }
+        #chatbox {
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        #messages {
+            flex: 1;
+            padding: 10px;
+            overflow-y: auto;
+        }
+        .message {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 10px;
+            max-width: 80%;
+        }
+        .user {
+            background: #4285f4;
+            margin-left: auto;
+        }
+        .bot {
+            background: #34a853;
+            margin-right: auto;
+        }
+        #micButton {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: #4285f4;
+            border: none;
+            color: white;
+            font-size: 30px;
+            margin: 20px auto;
+            display: block;
+        }
+        #status {
+            text-align: center;
+            margin-top: 10px;
+            color: #aaa;
+        }
+    </style>
+</head>
+<body>
+    <div id="chatbox">
+        <div id="messages">
+            <div class="message bot">
+                👋 Xin chào! Nhấn nút mic để nói chuyện
+            </div>
+        </div>
+        
+        <button id="micButton" onclick="startVoice()">🎤</button>
+        <div id="status">Sẵn sàng</div>
+    </div>
+
+    <script>
+        function startVoice() {
+            document.getElementById('status').textContent = "Đang nghe...";
+            document.getElementById('micButton').style.background = "#ea4335";
+            
+            // Kiểm tra trình duyệt hỗ trợ
+            if (!('webkitSpeechRecognition' in window)) {
+                alert("Vui lòng dùng Chrome browser");
+                return;
+            }
+            
+            const recognition = new webkitSpeechRecognition();
+            recognition.lang = 'vi-VN';
+            recognition.onresult = function(event) {
+                const text = event.results[0][0].transcript;
+                addMessage(text, 'user');
+                
+                // Phản hồi đơn giản
+                let response = "";
+                if (text.includes('xin chào')) response = "Chào bạn!";
+                else if (text.includes('mấy giờ')) {
+                    response = "Bây giờ là " + new Date().toLocaleTimeString('vi-VN');
+                }
+                else response = "Bạn nói: " + text;
+                
+                setTimeout(() => {
+                    addMessage(response, 'bot');
+                    speak(response);
+                }, 500);
+            };
+            
+            recognition.onend = function() {
+                document.getElementById('status').textContent = "Sẵn sàng";
+                document.getElementById('micButton').style.background = "#4285f4";
+            };
+            
+            recognition.start();
+        }
+        
+        function addMessage(text, sender) {
+            const messages = document.getElementById('messages');
+            const div = document.createElement('div');
+            div.className = 'message ' + sender;
+            div.textContent = text;
+            messages.appendChild(div);
+            messages.scrollTop = messages.scrollHeight;
+        }
+        
+        function speak(text) {
+            if ('speechSynthesis' in window) {
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'vi-VN';
+                speechSynthesis.speak(utterance);
+            }
+        }
+    </script>
+</body>
+</html>
