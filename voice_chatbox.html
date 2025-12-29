@@ -2,125 +2,385 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Voice Chat Test</title>
+    <title>Voice Chat Tiếng Việt</title>
     <style>
         body {
-            background: black;
-            color: white;
-            font-family: Arial;
-            padding: 20px;
             margin: 0;
+            background: transparent;
+            font-family: Arial, sans-serif;
         }
-        #chatbox {
-            width: 100%;
-            height: 100vh;
+        
+        #chatWindow {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 350px;
+            height: 500px;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            border: 2px solid #4285f4;
+            color: white;
             display: flex;
             flex-direction: column;
+            overflow: hidden;
         }
+        
+        #header {
+            background: #4285f4;
+            padding: 15px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 18px;
+        }
+        
         #messages {
             flex: 1;
-            padding: 10px;
+            padding: 15px;
             overflow-y: auto;
         }
+        
         .message {
             margin: 10px 0;
-            padding: 10px;
+            padding: 10px 15px;
             border-radius: 10px;
             max-width: 80%;
+            word-wrap: break-word;
         }
+        
         .user {
-            background: #4285f4;
+            background: rgba(66, 133, 244, 0.3);
             margin-left: auto;
+            text-align: right;
         }
+        
         .bot {
-            background: #34a853;
+            background: rgba(76, 175, 80, 0.3);
             margin-right: auto;
         }
+        
+        #voiceControls {
+            padding: 20px;
+            text-align: center;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
         #micButton {
-            width: 80px;
-            height: 80px;
+            width: 70px;
+            height: 70px;
             border-radius: 50%;
             background: #4285f4;
             border: none;
             color: white;
-            font-size: 30px;
-            margin: 20px auto;
-            display: block;
+            font-size: 28px;
+            cursor: pointer;
+            transition: all 0.3s;
         }
+        
+        #micButton.listening {
+            background: #ea4335;
+            transform: scale(1.1);
+        }
+        
         #status {
-            text-align: center;
             margin-top: 10px;
-            color: #aaa;
+            font-size: 14px;
+            color: #ccc;
+        }
+        
+        #voiceText {
+            margin-top: 5px;
+            font-size: 13px;
+            color: #4CAF50;
+            min-height: 20px;
         }
     </style>
 </head>
 <body>
-    <div id="chatbox">
+    <div id="chatWindow">
+        <div id="header">
+            🎤 Trợ lý ảo Smart Mirror
+        </div>
+        
         <div id="messages">
             <div class="message bot">
-                👋 Xin chào! Nhấn nút mic để nói chuyện
+                Xin chào! Tôi có thể giúp gì cho bạn?
+            </div>
+            <div class="message bot">
+                Nhấn nút mic để nói chuyện
             </div>
         </div>
         
-        <button id="micButton" onclick="startVoice()">🎤</button>
-        <div id="status">Sẵn sàng</div>
+        <div id="voiceControls">
+            <button id="micButton" onclick="toggleVoice()">
+                🎤
+            </button>
+            <div id="status">Sẵn sàng lắng nghe</div>
+            <div id="voiceText"></div>
+        </div>
     </div>
 
     <script>
-        function startVoice() {
-            document.getElementById('status').textContent = "Đang nghe...";
-            document.getElementById('micButton').style.background = "#ea4335";
+        // Biến toàn cục
+        let isListening = false;
+        let recognition = null;
+        let finalTranscript = '';
+        
+        // Hàm khởi tạo nhận diện giọng nói
+        function initVoiceRecognition() {
+            console.log("Đang khởi tạo nhận diện giọng nói...");
             
             // Kiểm tra trình duyệt hỗ trợ
-            if (!('webkitSpeechRecognition' in window)) {
-                alert("Vui lòng dùng Chrome browser");
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                alert("Trình duyệt không hỗ trợ nhận diện giọng nói. Vui lòng dùng Chrome.");
                 return;
             }
             
-            const recognition = new webkitSpeechRecognition();
-            recognition.lang = 'vi-VN';
+            // Tạo đối tượng nhận diện
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            
+            // Cấu hình
+            recognition.lang = 'vi-VN';  // Ngôn ngữ tiếng Việt
+            recognition.continuous = false;  // Dừng sau mỗi lần nói
+            recognition.interimResults = true;  // Hiển thị kết quả tạm thời
+            recognition.maxAlternatives = 1;  // Chỉ lấy 1 kết quả tốt nhất
+            
+            // Sự kiện khi bắt đầu nghe
+            recognition.onstart = function() {
+                console.log("Đang lắng nghe...");
+                updateStatus("Đang nghe... nói đi!");
+                document.getElementById('micButton').classList.add('listening');
+            };
+            
+            // Sự kiện khi có kết quả
             recognition.onresult = function(event) {
-                const text = event.results[0][0].transcript;
-                addMessage(text, 'user');
+                let interimTranscript = '';
                 
-                // Phản hồi đơn giản
-                let response = "";
-                if (text.includes('xin chào')) response = "Chào bạn!";
-                else if (text.includes('mấy giờ')) {
-                    response = "Bây giờ là " + new Date().toLocaleTimeString('vi-VN');
+                // Xử lý kết quả
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const transcript = event.results[i][0].transcript;
+                    
+                    if (event.results[i].isFinal) {
+                        finalTranscript = transcript;
+                        console.log("Nhận diện được:", finalTranscript);
+                        document.getElementById('voiceText').textContent = finalTranscript;
+                        
+                        // Xử lý lệnh
+                        processCommand(finalTranscript);
+                    } else {
+                        interimTranscript += transcript;
+                        document.getElementById('voiceText').textContent = interimTranscript;
+                    }
                 }
-                else response = "Bạn nói: " + text;
-                
-                setTimeout(() => {
-                    addMessage(response, 'bot');
-                    speak(response);
-                }, 500);
             };
             
+            // Sự kiện khi kết thúc
             recognition.onend = function() {
-                document.getElementById('status').textContent = "Sẵn sàng";
-                document.getElementById('micButton').style.background = "#4285f4";
+                console.log("Ngừng lắng nghe");
+                updateStatus("Sẵn sàng lắng nghe");
+                document.getElementById('micButton').classList.remove('listening');
+                isListening = false;
             };
             
-            recognition.start();
+            // Sự kiện khi có lỗi
+            recognition.onerror = function(event) {
+                console.error("Lỗi:", event.error);
+                updateStatus("Lỗi: " + event.error);
+                document.getElementById('micButton').classList.remove('listening');
+                isListening = false;
+            };
+            
+            console.log("Khởi tạo thành công!");
         }
         
-        function addMessage(text, sender) {
-            const messages = document.getElementById('messages');
-            const div = document.createElement('div');
-            div.className = 'message ' + sender;
-            div.textContent = text;
-            messages.appendChild(div);
-            messages.scrollTop = messages.scrollHeight;
-        }
-        
-        function speak(text) {
-            if ('speechSynthesis' in window) {
-                const utterance = new SpeechSynthesisUtterance(text);
-                utterance.lang = 'vi-VN';
-                speechSynthesis.speak(utterance);
+        // Hàm bật/tắt micro
+        function toggleVoice() {
+            if (!recognition) {
+                initVoiceRecognition();
+                return;
+            }
+            
+            if (!isListening) {
+                try {
+                    recognition.start();
+                    isListening = true;
+                    updateStatus("Đang bắt đầu...");
+                } catch (error) {
+                    console.error("Không thể bắt đầu:", error);
+                    updateStatus("Lỗi khi bắt đầu");
+                }
+            } else {
+                recognition.stop();
+                isListening = false;
             }
         }
+        
+        // Hàm cập nhật trạng thái
+        function updateStatus(text) {
+            document.getElementById('status').textContent = text;
+        }
+        
+        // Hàm xử lý lệnh tiếng Việt
+        function processCommand(command) {
+            console.log("Xử lý lệnh:", command);
+            
+            // Hiển thị lệnh người dùng
+            addMessage(command, 'user');
+            
+            // Chuyển sang chữ thường để dễ xử lý
+            const cmd = command.toLowerCase().trim();
+            
+            // Tìm câu trả lời phù hợp
+            let response = "";
+            
+            // Các lệnh cơ bản
+            if (cmd.includes('xin chào') || cmd.includes('hello') || cmd.includes('chào')) {
+                response = "Xin chào! Tôi là trợ lý ảo của Smart Mirror. Bạn cần gì ạ?";
+            } 
+            else if (cmd.includes('mấy giờ')) {
+                const now = new Date();
+                const time = now.toLocaleTimeString('vi-VN');
+                response = `Bây giờ là ${time}`;
+            }
+            else if (cmd.includes('ngày mấy')) {
+                const now = new Date();
+                const date = now.toLocaleDateString('vi-VN', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+                response = `Hôm nay là ${date}`;
+            }
+            else if (cmd.includes('thời tiết') || cmd.includes('trời mưa') || cmd.includes('nắng')) {
+                response = "Tôi sẽ kiểm tra thời tiết. Bạn đang ở thành phố nào?";
+            }
+            else if (cmd.includes('mở youtube') || cmd.includes('youtube')) {
+                response = "Đang mở YouTube...";
+                // Mở YouTube trong tab mới
+                setTimeout(() => {
+                    window.open('https://youtube.com', '_blank');
+                }, 500);
+            }
+            else if (cmd.includes('mở nhạc') || cmd.includes('nghe nhạc')) {
+                response = "Đang mở nhạc... Bạn thích nghe thể loại gì?";
+            }
+            else if (cmd.includes('cảm ơn') || cmd.includes('thank')) {
+                response = "Không có gì! Tôi luôn sẵn sàng giúp bạn.";
+            }
+            else if (cmd.includes('tạm biệt') || cmd.includes('bye')) {
+                response = "Tạm biệt bạn! Hẹn gặp lại.";
+            }
+            else {
+                response = `Tôi hiểu bạn nói: "${command}". Hiện tại tôi chưa học được lệnh này. Bạn có thể thử các lệnh như: "mấy giờ", "thời tiết", "mở youtube".`;
+            }
+            
+            // Hiển thị và đọc phản hồi
+            setTimeout(() => {
+                addMessage(response, 'bot');
+                speakText(response);
+            }, 800);
+        }
+        
+        // Hàm thêm tin nhắn vào khung chat
+        function addMessage(text, sender) {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            
+            messageDiv.className = `message ${sender}`;
+            messageDiv.textContent = text;
+            
+            messagesDiv.appendChild(messageDiv);
+            
+            // Tự động cuộn xuống dưới
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+        
+        // Hàm đọc văn bản (Text-to-Speech)
+        function speakText(text) {
+            if ('speechSynthesis' in window) {
+                // Dừng mọi giọng nói đang phát
+                speechSynthesis.cancel();
+                
+                // Tạo utterance mới
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'vi-VN';
+                utterance.rate = 1.0;  // Tốc độ bình thường
+                utterance.pitch = 1.0; // Độ cao bình thường
+                utterance.volume = 1.0; // Âm lượng tối đa
+                
+                // Tìm giọng nói tiếng Việt
+                const voices = speechSynthesis.getVoices();
+                console.log("Danh sách giọng có sẵn:", voices);
+                
+                let vietnameseVoice = null;
+                for (let voice of voices) {
+                    if (voice.lang === 'vi-VN' || voice.lang.startsWith('vi')) {
+                        vietnameseVoice = voice;
+                        break;
+                    }
+                }
+                
+                // Nếu tìm thấy giọng Việt thì dùng
+                if (vietnameseVoice) {
+                    utterance.voice = vietnameseVoice;
+                    console.log("Dùng giọng:", vietnameseVoice.name);
+                }
+                
+                // Sự kiện khi bắt đầu đọc
+                utterance.onstart = function() {
+                    console.log("Bắt đầu đọc...");
+                };
+                
+                // Sự kiện khi kết thúc
+                utterance.onend = function() {
+                    console.log("Kết thúc đọc");
+                };
+                
+                // Sự kiện khi có lỗi
+                utterance.onerror = function(event) {
+                    console.error("Lỗi đọc giọng:", event);
+                };
+                
+                // Bắt đầu đọc
+                speechSynthesis.speak(utterance);
+            } else {
+                console.log("Trình duyệt không hỗ trợ Text-to-Speech");
+            }
+        }
+        
+        // Khởi tạo khi trang load xong
+        window.onload = function() {
+            console.log("Trang đã tải xong");
+            
+            // Khởi tạo nhận diện giọng nói
+            initVoiceRecognition();
+            
+            // Lấy danh sách giọng nói (cần cho text-to-speech)
+            if (speechSynthesis.onvoiceschanged !== undefined) {
+                speechSynthesis.onvoiceschanged = function() {
+                    console.log("Đã tải danh sách giọng nói");
+                };
+            }
+            
+            // Thêm sự kiện cho phép sử dụng mic
+            document.addEventListener('click', function() {
+                // Yêu cầu quyền mic khi người dùng click lần đầu
+                if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                    navigator.mediaDevices.getUserMedia({ audio: true })
+                        .then(function(stream) {
+                            console.log("Đã được quyền sử dụng microphone");
+                            // Tắt stream ngay để tiết kiệm tài nguyên
+                            stream.getTracks().forEach(track => track.stop());
+                        })
+                        .catch(function(err) {
+                            console.error("Không được quyền mic:", err);
+                            updateStatus("Cần cấp quyền microphone");
+                        });
+                }
+            });
+        };
     </script>
 </body>
 </html>
