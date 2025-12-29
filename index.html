@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Smart Mirror</title>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            background: black;
+            color: white;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 50px;
+        }
+        a {
+            color: #4285f4;
+            text-decoration: none;
+            font-size: 20px;
+            display: block;
+            margin: 20px;
+            padding: 15px;
+            border: 2px solid #4285f4;
+            border-radius: 10px;
+            max-width: 300px;
+            margin: 20px auto;
+        }
+        a:hover {
+            background: #4285f4;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎭 Smart Mirror Dashboard</h1>
+    <p>Chọn chức năng:</p>
+    
+    <a href="voice_chatbox.html">🎤 Voice Chatbox (Nhận diện giọng nói)</a>
+    <a href="dashboard.html">📊 Full Dashboard (Dakboard + Chat)</a>
+    
+    <p style="margin-top: 50px; color: #888;">
+        Nếu không tự động chuyển trong 5 giây, nhấn vào link trên
+    </p>
+    
+    <script>
+        // Tự động chuyển sau 3 giây
+        setTimeout(function() {
+            window.location.href = "voice_chatbox.html";
+        }, 3000);
+    </script>
+</body>
+</html>
